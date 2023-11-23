@@ -1,0 +1,328 @@
+---
+title: "DS311 - EDA Lab Assignment"
+author: "William Lin, Norman Lo"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo = FALSE}
+rm(list=ls()) # Clean environment
+```
+
+# Explore the Ames Housing Dataset with R
+
+The Ames Housing dataset contains information about home sales in Ames, Iowa between 2006 and 2010.
+
+## 1. Load the Data
+
+```{r}
+df <- read.csv("/Users/linw/Desktop/DS311-Technologies-in-Data-Analytic-FA23/Week_09_Exploratory_Data_Analysis/EDA_Python/data/ames.csv")
+df <- df[, -1] # Remove index column
+```
+
+The following code checks the dimensions of the data.
+
+```{r}
+dim(df)
+```
+
+There are 1460 rows (homes) and 80 columns (variables) in the dataset. 
+
+Inspect the contents of the dataframe:
+
+```{r}
+df[1:40, 1:8] # First 40 observations and first 8 variables
+```
+
+```{r}
+str(df)
+```
+
+<br>
+
+## 2. Explore Data Distributions
+
+### Sale Price
+
+Histogram for SalePrice:
+
+```{r}
+hist(df$SalePrice, xlab = "Sale Price", col = ("#1f77b4"),
+     ylab = "Number of Houses", main = "Distribution of Sale Prices",
+     breaks = seq(-7500, 802500, by = 15000), ylim = c(0, 200))
+abline(v = mean(df$SalePrice), col = 'black', lwd = 2)
+```
+
+Summary statistics:
+
+```{r}
+y = df$SalePrice
+
+text <- function(y) {
+  noquote(c(paste("Median:", median(y)), paste("Mean:", mean(y)),
+                 paste("Standard Deviation:", sd(y))))
+}
+
+summary(y); cat(text(y), sep="\n")
+```
+The distribution of sale prices looks like a log normal distribution. Most houses in this sample are clustered around the median value of \$63,000, but the higher-end homes are pulling the mean up to over \$180,000.
+
+### Total Rooms Above Grade
+
+Histogram for TotRmsAbvGrd:
+
+```{r}
+hist(df$TotRmsAbvGrd, xlab = "Total Rooms (Excluding Bathrooms)", 
+     ylab = "Number of Houses", breaks = seq(1.25, 14.25, by = 0.5), 
+     main = "Distribution of Total Rooms Above Grade", 
+     col = ("#1f77b4"), border=par('bg'))
+abline(v = mean(df$TotRmsAbvGrd), col = 'black', lwd = 2)
+```
+
+Summary statistics: 
+
+```{r}
+y = df$TotRmsAbvGrd
+summary(y); cat(text(y), sep="\n")
+```
+The number of rooms in houses is approximately normally distributed, 
+with a mean and median around 6 rooms. There are some houses with
+twice as many rooms as the average, but overall the distribution is
+less skewed than the sale price distribution.
+
+### Overall Condition
+
+Histogram for OverallCond: 
+
+```{r}
+hist(df$OverallCond, xlab = "Condition of House", 
+     ylab = "Number of Houses", breaks = seq(0.75, 9.25, by = 0.5), 
+     main = "Distribution of House Condition on a 1-10 Scale", 
+     xlim = range(1, 10),
+     col = ("#1f77b4"), border=par('bg'))
+abline(v = mean(df$OverallCond), col = 'black', lwd = 2)
+```
+
+Summary statistics: 
+
+```{r}
+y = df$OverallCond
+summary(y); cat(text(y), sep="\n")
+```
+
+Most homes have a condition of 5. It seems like we should treat this as a categorical rather than numeric variable, since the difference between conditions is so abrupt.
+
+<br>
+
+## 3. Explore Differences between Subsets
+
+One useful way to explore a categorical variable is to create subsets of the full dataset based on that categorical variable, then plot their distributions based on some other variable. Since this dataset is traditionally used for predicting the sale price of a house, let's use SalePrice as that other variable.
+
+Create three variables, each of which represents a record-wise subset of df (meaning, it has the same columns as df, but only some of the rows).
+
++ below_average_condition: home sales where the overall condition was less than 5
+
+
++ average_condition: home sales where the overall condition was exactly 5
+
+
++ above_average_condition: home sales where the overall condition was greater than 5
+
+```{r}
+below_average_condition = df[df$OverallCond < 5, ]
+average_condition = df[df$OverallCond == 5, ]
+above_average_condition = df[df$OverallCond > 5, ]
+```
+
+The following code will produce a plot of the distributions of sale price for each of these subsets:
+
+```{r}
+a = below_average_condition$SalePrice
+b = average_condition$SalePrice
+c = above_average_condition$SalePrice
+
+# Create colors with reduced opacity (alpha) to see overlap
+c1 = rgb(255,255,127, max = 255, alpha = 128) # Yellow
+c2 = rgb(216,216,216, max = 255, alpha = 77)  # Grey
+c3 = rgb(127,255,255, max = 255, alpha = 128) # Cyan
+
+# Create custom bins so all are on the same scale
+breaks_by = as.integer(median(df$SalePrice) / 20)
+breaks_seq = seq(min(df$SalePrice), max(df$SalePrice) + breaks_by,
+                 by = breaks_by)
+
+hgA = hist(a, breaks = breaks_seq, plot = FALSE)
+hgB = hist(b, breaks = breaks_seq, plot = FALSE)
+hgC = hist(c, breaks = breaks_seq, plot = FALSE)
+
+# Plot three histograms
+plot(hgB, col = c2, ylim = c(0, 70), 
+     xlab = "Sale Price", ylab = "Number of Houses",
+     main = "Distribution of Sale Price Grouped by Condition")
+plot(hgC, col = c3, add = TRUE)
+plot(hgA, col = c1, add = TRUE)
+legend("topright", 
+       legend = c("above average condition", 
+                  "average condition",
+                  "below average condition"),
+       col = c(c3, c2, c1), cex = 0.5, 
+       pch = 15, pt.cex = 1.3)
+```
+
+First, we note again that the majority of the houses have average
+condition, then about 1/3 have above average condition, then less
+than 10% have below average condition.
+
+As we might expect, the average condition therefore contains houses
+across a broader spectrum of the sale price range than either the
+below-average or above-average houses.
+
+Another unsurprising finding is that below-average condition houses
+have a price distribution that is much lower than average or
+above-average condition houses.
+
+But what might be surprising is that above-average condition houses
+do not seem to have higher average sale prices than average condition
+houses. In fact, above-average condition houses seem more clustered
+around a particular price range, especially the \$100,000 to \$200,000 range, whereas average condition houses are more frequent above \$200,000. We might want to investigate further to understand what kinds of houses are rated as above-average condition, since this goes against a standard assumption that better condition would mean higher cost.
+
+<br>
+
+
+## 4. Explore Correlations
+
+To understand more about what features of these homes lead to higher sale prices, let's look at some correlations. We'll return to using the full df, rather than the subsets.
+
+In the cell below, print out both the name of the column and the Pearson correlation for the column that is most positively correlated with SalePrice (other than SalePrice, which is perfectly correlated with itself).
+
+We'll only check the correlations with some kind of numeric data type.
+
+```{r}
+# Create a df that contains only numeric columns
+# and doesn't include SalePrice
+numeric_df = df[, unlist(lapply(df, is.numeric))]
+numeric_df = numeric_df[, !names(numeric_df) %in% "SalePrice"]
+
+# Create list of correlations
+correlations = cor(numeric_df, df$SalePrice)
+
+# Find the largest value, and the column name at that index
+max_corr_value = max(correlations, na.rm = TRUE)
+i = which(correlations == max_corr_value) 
+max_corr_column = rownames(correlations)[[i]]
+
+noquote(c(paste("Most Positively Correlated Column:", 
+                max_corr_column), 
+          paste("Most Positively Correlated Value:",
+                max_corr_value)))
+```
+
+Now, find the most negatively correlated column:
+
+```{r}
+min_corr_value = min(correlations, na.rm = TRUE)
+j = which(correlations == min_corr_value) 
+min_corr_column = rownames(correlations)[[j]]
+
+noquote(c(paste("Most Negatively Correlated Column:", 
+                min_corr_column), 
+          paste("Most Negative Correlated Value:",
+                min_corr_value)))
+```
+
+Boxplots of the relevant columns:
+
+```{r}
+library(RColorBrewer)
+colors = brewer.pal(n = length(unique(df[, max_corr_column])), 
+                    name = "Set3") 
+colors2 = brewer.pal(n = length(unique(df[, min_corr_column])), 
+                    name = "Set2") 
+
+boxplot(df$SalePrice ~ df[, max_corr_column], 
+        xlab = "OverallQuality", ylab = "Sale Price",
+        main = "Overall Quality vs. Sale Price",
+        col = colors)
+boxplot(df$SalePrice ~ df[, min_corr_column], 
+        xlab = "Number of Kitchens Above Ground", 
+        ylab = "Sale Price", col = colors2,
+        main = "Number of Kitchens vs. Sale Price")
+```
+
+The column with the highest correlation is overall quality.
+According to the data description:
+
+OverallQual: Rates the overall material and finish of the house
+
+       10	Very Excellent
+       9	Excellent
+       8	Very Good
+       7	Good
+       6	Above Average
+       5	Average
+       4	Below Average
+       3	Fair
+       2	Poor
+       1	Very Poor
+       
+It is somewhat difficult to understand how this is different from
+OverallCond, which has similar values.
+
+There is a clear positive relationship between overall quality and
+sale price, although it looks like potentially an exponential
+relationship rather than a linear one. For example, the minimum
+"non-outlier" (Q1 - 1.5*IQR) home with quality 10 (Very Excellent)
+sells for about the same price as the median home with quality 6
+(Above Average).
+
+The column with the most negative correlation is the number of 
+kitchens above ground. According to the data description:
+
+KitchenAbvGr: Kitchens above grade
+
+From the plot, it is clear that almost all houses have 1 or 2
+kitchens above grade, although there are some with 0 or 3.
+
+Somewhat similar to the earlier OverallCond discussion, it seems
+that more kitchens are associated with lower price, which is
+somewhat counterintuitive. Essentially all of the houses with 2
+kitchens sold for less than \$200,000, whereas homes with 1 kitchen
+sometimes sold for much more.
+
+One thing we might want to investigate is what kinds of homes have
+two kitchens. Are they also homes with low quality, possibly student
+housing at Iowa State University?
+
+<br>
+
+
+## 5. Engineer and Explore a New Feature
+
+Create a new feature Age, which represents the difference between the year sold and the year built, and plot the relationship between the age and sale price.
+
+```{r}
+# Make a new column, Age
+df$Age = df$YrSold - df$YearBuilt
+
+# Plot Age vs. SalePrice
+plot(df$Age, df$SalePrice, xlab = "Age of Home at Time of Sale",
+     ylab = "Sale Price", col = "darkgreen",
+     main = "Home Age vs. Sale Price")
+```
+
+In general, newer houses appear to be more valuable, with value increasing
+as homes age. Interestingly the variance seems to increase once the home
+age goes over 100 years, with several above-average sale prices and fewer
+home sales in general.
+
+We are also seeing potential housing booms and busts over the past decades,
+indicated by e.g. relatively few 20-year-old houses compared to 25-year-old houses
+being sold. We might find something interesting if we investigate this further.
+
